@@ -120,6 +120,9 @@ $$('label[data-check]').forEach((l) => {
   l.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); l.click(); } });
 });
 const bind = (k, v) => $$(`[data-b="${k}"]`).forEach((e) => { e.innerHTML = v; });
+const setLogo = (top) => { const L = (MOB ? window.KOTE_LOGOS_M : window.KOTE_LOGOS) || {}; if (L[top]) $$('[data-logo]').forEach((e) => { e.innerHTML = L[top]; }); };
+const qs = new URLSearchParams(location.search);
+const flash = sessionStorage.getItem('kote-toast'); if (flash) { sessionStorage.removeItem('kote-toast'); setTimeout(() => toast(flash), 400); }
 
 /* ---------- mobile menu ---------- */
 const menuBtn = $('[aria-label="Menu"]');
@@ -128,7 +131,7 @@ if (menuBtn) menuBtn.addEventListener('click', () => {
   if (!m) {
     m = document.createElement('div'); m.className = 'k-menu';
     m.innerHTML = `<button type="button" class="k-menu-x" aria-label="Close menu">×</button>
-      <a href="${P('index.html')}">Home</a><a href="${P('search.html')}">All routes</a><a href="${P('route-lyngen.html')}">Lyngen Alps traverse</a><a href="${P('route-sarek.html')}">Sarek, no trail</a>
+      <a href="${P('index.html')}">Home</a><a href="${P('search.html')}">All routes</a><a href="${P('departures.html')}">Departures</a><a href="${P('grades.html')}">Grades</a><a href="${P('guides.html')}">Guides</a><a href="${P('safety.html')}">Safety</a><a href="${P('fitness.html')}">Fitness check</a>
       <a href="${P('my-trips.html')}">My trips</a><a href="agency.html">Agency view</a>
       <p>Kote is a concept by Iryna Chelombitko. Not a real company, nothing is charged.</p>`;
     root.appendChild(m);
@@ -249,6 +252,7 @@ if (page === 'route') {
   // booking panel: shows this route; the booking in progress switches to it on the first touch
   const mine = S.route === PK;
   const L = { dep: mine ? S.dep : PR.defdep, n: S.n };
+  const qd = +qs.get('dep'); if (qs.has('dep') && PR.deps[qd] && 8 - PR.deps[qd].taken > 0) L.dep = qd;
   const lfree = (i = L.dep) => 8 - PR.deps[i].taken;
   if (lfree() < 1) L.dep = PR.defdep;
   if (L.n > Math.min(4, lfree())) L.n = Math.max(1, Math.min(4, lfree()));
@@ -454,6 +458,131 @@ if (page === 'trips') {
   bind('bal-btn', t.pay === 'full' ? 'Paid in full' : 'Pay balance');
   bind('travel-a', TR.travel[0]);
   bind('travel-b', TR.travel[1]);
+  const kitN = ((S.kit || {})[t.route] || []).length, kitT = TR.kitn || 31;
+  bind('kit-sub', `${kitN} of ${kitT} items ticked`);
+  bind('kit-count', `${kitN} of ${kitT}`);
+  $$('[data-kitbar]').forEach((e) => { let h = ''; for (let i = 0; i < kitT; i++) h += `<span style="flex:1;height:8px;background:${i < kitN ? INK : '#14181A26'}"></span>`; e.innerHTML = h; });
+  bind('ready-n', `${2 + (kitN >= kitT ? 1 : 0) + (t.pay === 'full' ? 1 : 0)} of 5 done`);
+}
+
+/* ================================================================ DEPARTURES */
+if (page === 'departures') {
+  const chips = $$('[data-m-chip]');
+  chips.forEach((c) => c.addEventListener('click', () => {
+    chips.forEach((x) => press(x, x === c, CHIP_ON, CHIP_OFF));
+    const m = c.dataset.mChip; let n = 0;
+    $$('[data-m]').forEach((e) => {
+      const on = m === 'all' || e.dataset.m === m;
+      if (e.style.position === 'absolute') e.style.opacity = on ? '' : '0.18';
+      else { e.style.display = on ? '' : 'none'; if (on) n++; }
+    });
+    $$('[data-m-group]').forEach((g) => { g.style.display = m === 'all' || g.dataset.mGroup === m ? '' : 'none'; });
+    bind('dep-count', `${n} departure${n === 1 ? '' : 's'}`);
+  }));
+}
+
+/* ================================================================ FITNESS CHECK */
+if (page === 'fitness') {
+  const Q = window.KOTE_QUIZ || { G: [], routes: {} };
+  const N = 5;
+  const A = (S.fit && Array.isArray(S.fit.a)) ? S.fit.a.slice(0, N) : [];
+  const paint = () => {
+    $$('[data-q]').forEach((b) => press(b, A[+b.dataset.q] === +b.dataset.a, CARD_ON, CARD_OFF));
+    const done = A.filter((v) => v !== undefined && v !== null).length;
+    if (done < N) {
+      bind('fit-label', done ? `${N - done} question${N - done > 1 ? 's' : ''} to go` : 'Answer all five to see your grade');
+      bind('fit-grade', '?'); bind('fit-name', ''); bind('fit-text', ''); bind('fit-routes', '');
+      $$('[data-fit-reset]').forEach((b) => { b.style.display = done ? '' : 'none'; });
+      return;
+    }
+    $$('[data-fit-reset]').forEach((b) => { b.style.display = ''; });
+    const sc = A.reduce((a, v) => a + v, 0);
+    let g = sc <= 2 ? 1 : sc <= 4 ? 2 : sc <= 6 ? 3 : sc <= 9 ? 4 : 5;
+    if (A[4] === 0) g = Math.min(g, 4);
+    if (A[3] === 0) g = Math.min(g, 3);
+    if (A[2] === 0) g = Math.min(g, 2);
+    const G = Q.G[g - 1];
+    bind('fit-label', 'Your grade, before the call');
+    bind('fit-grade', g); bind('fit-name', G.short);
+    bind('fit-text', `Days up to ${G.a}, ${G.h}. Pack ${G.p}. ${G.t}.`);
+    let rs = (Q.routes[g] || []).concat(g >= 4 ? (Q.routes[g - 1] || []) : []);
+    let note = '';
+    if (!rs.length) { rs = Q.routes[3] || []; note = `<div style="font-size:14px;line-height:1.45;color:#D3D9DA">Kote runs grades 3 to 5 only. These two are the gentlest; mention it on the call.</div>`; }
+    bind('fit-routes', note + rs.map((r) => `<a href="${P('route-' + r.slug + '.html')}" style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;border-top:1px solid #F3F5F433;text-decoration:none;color:#F3F5F4"><span style="font-size:20px;font-weight:800;font-stretch:62%">${r.name}</span><span style="font-size:13px;color:#B9C1C3">grade ${r.g}, ▲${r.top}</span></a>`).join(''));
+    const top = rs.reduce((m, r) => Math.max(m, r.top), 0); if (top) setLogo(String(top));
+    S.fit = { a: A.slice(), g }; save();
+  };
+  $$('[data-q]').forEach((b) => b.addEventListener('click', () => {
+    A[+b.dataset.q] = +b.dataset.a; paint();
+    const done = A.filter((v) => v !== undefined && v !== null).length;
+    if (done === N && MOB) { const r = $('[data-fit-result]'); if (r) r.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  }));
+  $$('[data-fit-reset]').forEach((b) => b.addEventListener('click', () => { A.length = 0; delete S.fit; save(); setLogo('1520'); paint(); }));
+  paint();
+}
+
+/* ================================================================ KIT LIST */
+if (page === 'kit') {
+  const K = window.KOTE_KIT || { items: {}, cats: [] };
+  const rk = RT[qs.get('r')] ? qs.get('r') : TRIP.t.route;
+  const KR = RT[rk];
+  const items = K.items[rk] || [];
+  const rented = rk === TRIP.t.route ? (TRIP.t.ex || {}) : {};
+  S.kit = S.kit || {};
+  const have = new Set(S.kit[rk] || []);
+  items.forEach((it) => { if (it.ex && rented[it.ex]) have.add(it.id); });
+  setLogo(String(KR.top));
+  bind('kit-sub', `For the ${KR.name}. Pack this, then open the bag at the briefing in ${KR.meet} the evening before day 1.`);
+  const list = $('[data-kit-list]');
+  const row = (it) => {
+    const on = have.has(it.id), r = it.ex && rented[it.ex];
+    const note = r ? `Rented, waits in ${KR.meet}` : it.note;
+    return `<label data-kit="${it.id}" role="checkbox" tabindex="0" aria-checked="${on}" style="display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-top:1px solid #14181A26;cursor:pointer;font-size:${MOB ? 15 : 16}px${MOB ? ';padding-left:20px;padding-right:20px' : ''}">
+<span style="width:18px;height:18px;flex:none;margin-top:1px;box-sizing:border-box;${on ? 'background:' + INK + ';display:flex;align-items:center;justify-content:center' : 'border:1.5px solid ' + INK}">${on ? BOX_ON : ''}</span>
+<span style="flex:1"><span style="${on ? 'color:#4A5458;text-decoration:line-through' : ''}">${it.name}</span>${note ? `<span style="display:block;font-size:13px;color:${r ? INK : '#4A5458'};margin-top:2px;${r ? 'font-weight:700' : ''}">${note}</span>` : ''}</span></label>`;
+  };
+  const render = () => {
+    list.innerHTML = K.cats.map(([c, title]) => {
+      const its = items.filter((i) => i.cat === c); if (!its.length) return '';
+      return `<div style="display:flex;flex-direction:column;${MOB ? 'padding-top:14px' : 'padding-bottom:22px'}"><div style="font-size:${MOB ? 26 : 30}px;font-weight:800;font-stretch:62%;padding:0 ${MOB ? '20px' : '0'} 8px">${title}</div>${its.map(row).join('')}</div>`;
+    }).join('');
+    const n = items.filter((i) => have.has(i.id)).length;
+    bind('kit-count', `${n} of ${items.length}`);
+    $$('[data-kitbar]').forEach((e) => { let h = ''; for (let i = 0; i < items.length; i++) h += `<span style="flex:1;height:8px;background:${i < n ? INK : '#14181A26'}"></span>`; e.innerHTML = h; });
+    $$('[data-kit]', list).forEach((l) => {
+      const flip = () => { const id = l.dataset.kit; have.has(id) ? have.delete(id) : have.add(id); S.kit[rk] = [...have]; save(); render(); if ([...have].length === items.length) toast('Everything packed. See you at the briefing.'); };
+      l.addEventListener('click', (e) => { e.preventDefault(); flip(); });
+      l.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(); } });
+    });
+  };
+  S.kit[rk] = [...have]; save();
+  render();
+}
+
+/* ================================================================ PAY BALANCE */
+if (page === 'pay') {
+  const { t, R: TR, d } = TRIP;
+  paintRoute(TR);
+  setLogo(String(TR.top));
+  bind('pay-dates', d.full);
+  let lines = `<div class="k-line"><span>${t.n} × ${TR.name}</span><span>${eur(TR.price * t.n)}</span></div>`;
+  EXTRAS.forEach((x) => { const q = (t.ex || {})[x.k] || 0; if (q && TR.extras && TR.extras[x.k] !== undefined) lines += `<div class="k-line"><span>${q} × ${x.name}</span><span>${eur(q * x.price)}</span></div>`; });
+  lines += `<div class="k-line" style="color:#4A5458"><span>Deposit paid</span><span>−${eur(DEPOSIT * t.n)}</span></div>`;
+  bind('pay-lines', lines);
+  const paid = t.pay === 'full';
+  bind('pay-now', paid ? '€0' : eur(TRIP.balance));
+  bind('pay-sub', paid ? `Your ${TR.name} trip is paid in full. Nothing left to do here.` : `Balance for your ${TR.name} trip, due ${TRIP.due}. Pay it now and you are done.`);
+  $$('[data-balance-go]').forEach((b) => {
+    b.textContent = paid ? 'Paid in full' : `Pay ${eur(TRIP.balance)}`;
+    if (paid) { b.style.background = '#14181A26'; b.style.cursor = 'default'; }
+    b.addEventListener('click', () => {
+      if (paid) return;
+      b.textContent = 'Paying…';
+      S.trip = Object.assign({}, t, { pay: 'full' }); save();
+      sessionStorage.setItem('kote-toast', 'Balance paid. Nothing left to pay before the trip.');
+      setTimeout(() => { location.href = P('my-trips.html'); }, 700);
+    });
+  });
 }
 
 /* ================================================================ AGENCY */
