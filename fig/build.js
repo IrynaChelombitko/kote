@@ -183,25 +183,26 @@
     }
   };
 
-  // ---------- screens
+  // ---------- screens: fetch all, drop the old copies, lay them out left to right in the given order
   const made = [];
+  const datas = [];
+  for (const slug of SLUGS) datas.push(await (await fetch(BASE + slug + '.json?' + Date.now())).json());
+  const names = new Set(datas.map(d => d.name));
+  let y0 = 0;
+  for (const n of [...page.children]) if (n.type === 'FRAME' && names.has(n.name)) { y0 = n.y; n.remove(); }
   let x = 0;
   for (const n of page.children) x = Math.max(x, n.x + n.width + 200);
-  for (const slug of SLUGS) {
-    const d = await (await fetch(BASE + slug + '.json?' + Date.now())).json();
-    const old = page.children.find(n => n.name === d.name && n.type === 'FRAME');
-    let X = x, Y = 0;
-    if (old) { X = old.x; Y = old.y; old.remove(); }
+  for (const d of datas) {
     const root = figma.createFrame();
     root.name = d.name;
     root.resize(d.w, d.h);
-    root.x = X; root.y = Y;
+    root.x = x; root.y = y0;
     root.fills = d.fill ? [paint(d.fill)] : [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
     root.clipsContent = true;
     for (const c of d.ch) await build(c, root);
     made.push(root.id);
-    if (!old) x += d.w + (d.w < 500 ? 80 : 200);
-    log.push(slug + ' ok');
+    x += d.w + (d.w < 500 ? 80 : 200);
+    log.push(d.slug + ' ok');
   }
   print(log.join(', '), '| errors:', errs.length, errs.slice(0, 12).join(' || '), '| sec', Math.round((Date.now() - t0) / 1000));
   return made;
