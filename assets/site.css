@@ -32,3 +32,12 @@ button:focus-visible,a:focus-visible,label:focus-visible,input:focus-visible{out
 .k-concept{font-size:13px;color:#B9C1C3}
 .k-concept a{color:#F3F5F4}
 @media (prefers-reduced-motion:reduce){.k-toast{transition:none}}
+@view-transition{navigation:auto}
+::view-transition-old(root){animation:k-out .2s ease both}
+::view-transition-new(root){animation:k-in .34s cubic-bezier(.2,.7,.2,1) both}
+::view-transition-group(*){animation-duration:.44s;animation-timing-function:cubic-bezier(.2,.7,.2,1)}
+@keyframes k-out{to{opacity:0}}
+@keyframes k-in{from{opacity:0;transform:translateY(12px)}}
+[data-day]{transition:background-color .2s}
+[data-dep],[data-dep-card],[data-pay]{transition:background-color .15s,border-color .15s}
+@media (prefers-reduced-motion:reduce){::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}[data-day],[data-dep],[data-dep-card],[data-pay]{transition:none}}

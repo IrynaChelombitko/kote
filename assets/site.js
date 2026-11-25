@@ -20,37 +20,48 @@ addEventListener('resize', fit);
 addEventListener('scroll', () => { if (window.__onScroll) window.__onScroll(scrollY / (window.__z || 1)); }, { passive: true });
 
 /* ---------- state kept between pages ---------- */
-const DEPS = [
-  { d: '8 to 13 Jul', full: '8 to 13 July 2027', start: [2027, 6, 8], taken: 5, guide: 'Ingrid H.' },
-  { d: '22 to 27 Jul', full: '22 to 27 July 2027', start: [2027, 6, 22], taken: 6, guide: 'Mats E.' },
-  { d: '5 to 10 Aug', full: '5 to 10 August 2027', start: [2027, 7, 5], taken: 6, guide: 'Ingrid H.' },
-  { d: '19 to 24 Aug', full: '19 to 24 August 2027', start: [2027, 7, 19], taken: 3, guide: 'Siri L.' },
-];
+const RT = window.KOTE_ROUTES || {};
 const EXTRAS = [
   { k: 'crampons', name: 'crampons and axe', price: 40, per: true },
   { k: 'harness', name: 'harness and helmet', price: 30, per: true },
   { k: 'bag', name: 'sleeping bag', price: 40, per: true },
   { k: 'insurance', name: 'rescue insurance', price: 60, per: true },
-  { k: 'tent', name: 'own tent at the lake', price: 35, per: false },
+  { k: 'tent', name: 'own tent', price: 35, per: false },
 ];
-const PRICE = 2350, DEPOSIT = 400;
-const def = { dep: 1, n: 2, share: true, ex: { crampons: 2, harness: 0, bag: 1, insurance: 0, tent: 0 }, pay: 'deposit', terms: true, saved: false };
+const DEPOSIT = 400;
+const EX0 = { crampons: 0, harness: 0, bag: 0, insurance: 0, tent: 0 };
+const exDefault = (k) => (k === 'hero' ? { crampons: 2, harness: 0, bag: 1, insurance: 0, tent: 0 } : Object.assign({}, EX0));
+const def = { route: 'hero', dep: 1, n: 2, share: true, ex: exDefault('hero'), pay: 'deposit', terms: true, saved: {} };
 let S;
 try { S = Object.assign({}, def, JSON.parse(localStorage.getItem('kote') || '{}')); } catch (e) { S = Object.assign({}, def); }
-S.ex = Object.assign({}, def.ex, S.ex || {});
+if (!RT[S.route]) S.route = 'hero';
+S.ex = Object.assign({}, EX0, S.ex || {});
+if (typeof S.saved !== 'object' || !S.saved) S.saved = S.saved ? { hero: true } : {};
 const save = () => { try { localStorage.setItem('kote', JSON.stringify(S)); } catch (e) {} };
-const dep = () => DEPS[S.dep];
-const free = (i = S.dep) => 8 - DEPS[i].taken;
+let R = RT[S.route] || RT.hero;
+const DEPS = () => R.deps;
+const PRICE = () => R.price;
+const dep = () => R.deps[S.dep] || R.deps[R.defdep];
+const free = (i = S.dep) => 8 - R.deps[i].taken;
 const eur = (v) => '€' + v.toLocaleString('en-US');
 const words = ['No', 'One', 'Two', 'Three', 'Four'];
-const extrasTotal = () => EXTRAS.reduce((a, x) => a + x.price * (S.ex[x.k] || 0), 0);
-const total = () => PRICE * S.n + extrasTotal();
+const allowed = () => EXTRAS.filter((x) => R.extras && R.extras[x.k] !== undefined);
+const extrasTotal = () => allowed().reduce((a, x) => a + x.price * (S.ex[x.k] || 0), 0);
+const total = () => PRICE() * S.n + extrasTotal();
 const depositDue = () => (S.pay === 'full' ? total() : DEPOSIT * S.n);
 const dateOf = (a) => new Date(a[0], a[1], a[2]);
 const fmtDay = (dt) => dt.getDate() + ' ' + dt.toLocaleString('en-GB', { month: 'long' });
-const balanceDate = () => { const t = dateOf(dep().start); t.setDate(t.getDate() - 56); return fmtDay(t); };
+const balanceDate = (d = dep()) => { const t = dateOf(d.start); t.setDate(t.getDate() - 56); return fmtDay(t); };
 const MAXN = () => Math.min(4, free());
+/* switch the booking in progress to another route */
+const useRoute = (k) => {
+  if (!RT[k] || S.route === k) return;
+  S.route = k; R = RT[k]; S.dep = R.defdep; S.ex = exDefault(k);
+  if (S.n > MAXN()) S.n = Math.max(1, MAXN());
+};
+if (!R.deps[S.dep] || free() < 1) S.dep = R.defdep;
 if (S.n > MAXN()) S.n = Math.max(1, MAXN());
+const routeUrl = (k = S.route) => P('route-' + RT[k].slug + '.html');
 
 /* ---------- toast ---------- */
 const toast = (html, ms = 3200) => {
@@ -59,8 +70,11 @@ const toast = (html, ms = 3200) => {
   t.innerHTML = html; t.classList.add('on');
   clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), ms);
 };
-const SOON = 'Not part of this concept yet. Try search, the Lyngen route or booking.';
-const ONLY_LYNGEN = `This concept has one full route page. <a href="${P('route-lyngen.html')}">Open Lyngen Alps</a>`;
+const SOON = 'Not part of this concept yet. Try search, a route page or booking.';
+const ONLY_LYNGEN = `Not designed in this concept. <a href="${P('search.html')}">See all routes</a>`;
+
+/* ---------- page transitions: shared photos keep their place ---------- */
+$$('[data-vt]').forEach((e) => { e.style.viewTransitionName = e.dataset.vt; });
 
 /* ---------- generic clicks ---------- */
 document.addEventListener('click', (e) => {
@@ -114,7 +128,7 @@ if (menuBtn) menuBtn.addEventListener('click', () => {
   if (!m) {
     m = document.createElement('div'); m.className = 'k-menu';
     m.innerHTML = `<button type="button" class="k-menu-x" aria-label="Close menu">×</button>
-      <a href="${P('index.html')}">Home</a><a href="${P('search.html')}">Routes</a><a href="${P('route-lyngen.html')}">Lyngen Alps traverse</a>
+      <a href="${P('index.html')}">Home</a><a href="${P('search.html')}">All routes</a><a href="${P('route-lyngen.html')}">Lyngen Alps traverse</a><a href="${P('route-sarek.html')}">Sarek, no trail</a>
       <a href="${P('my-trips.html')}">My trips</a><a href="agency.html">Agency view</a>
       <p>Kote is a concept by Iryna Chelombitko. Not a real company, nothing is charged.</p>`;
     root.appendChild(m);
@@ -130,15 +144,14 @@ go('[aria-label="My trips"]', P('my-trips.html'));
 $$('[data-act="share"], [aria-label="Share"]').forEach((b) => b.addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(location.href); toast('Link copied'); } catch (e) { toast('Copy the address from the browser bar'); }
 }));
+const SAVEKEY = document.body.dataset.route || S.route;
 const paintSave = () => $$('[data-act="save"], [aria-label="Save"]').forEach((b) => {
-  if (b.textContent.trim()) b.textContent = S.saved ? 'Saved' : 'Save';
-  b.style.background = S.saved ? INK : 'transparent';
-  const p = $('path', b); if (p) p.setAttribute('fill', S.saved ? INK : 'none');
-  if (!b.textContent.trim()) b.style.background = 'transparent';
+  const on = !!S.saved[SAVEKEY];
+  if (b.textContent.trim()) { b.textContent = on ? 'Saved' : 'Save'; b.style.background = on ? INK : 'transparent'; b.style.color = on ? SNOW : INK; }
+  else { b.style.background = 'transparent'; const p = $('path', b); if (p) p.setAttribute('fill', on ? INK : 'none'); }
 });
-$$('[data-act="save"], [aria-label="Save"]').forEach((b) => b.addEventListener('click', () => { S.saved = !S.saved; save(); paintSave(); if (!b.textContent.trim() || true) b.style.color = S.saved && b.textContent.trim() ? SNOW : INK; toast(S.saved ? 'Saved to My trips' : 'Removed from saved'); }));
+$$('[data-act="save"], [aria-label="Save"]').forEach((b) => b.addEventListener('click', () => { S.saved[SAVEKEY] = !S.saved[SAVEKEY]; save(); paintSave(); toast(S.saved[SAVEKEY] ? 'Saved to My trips' : 'Removed from saved'); }));
 paintSave();
-$$('[data-act="save"]').forEach((b) => { b.style.color = S.saved ? SNOW : INK; });
 
 /* ================================================================ HOME */
 if (page === 'home') {
@@ -223,31 +236,42 @@ if (page === 'search') {
 
 /* ================================================================ ROUTE */
 if (page === 'route') {
+  const PK = document.body.dataset.route || 'hero';
+  const PR = RT[PK];
   // day picker: profile and rows
   const pick = (i) => {
     $$('[data-prof]').forEach((p) => { p.style.display = +p.dataset.prof === i ? '' : 'none'; });
     $$('[data-day]').forEach((r) => { const on = +r.dataset.day === i; r.classList.toggle('k-day-on', on); const x = $('[data-day-more]', r); if (x) x.style.display = on ? '' : 'none'; });
-    $$('[data-day-label]').forEach((t) => { t.setAttribute('font-weight', +t.dataset.dayLabel === i ? 700 : 400); });
   };
   $$('[data-day]').forEach((r) => r.addEventListener('click', () => pick(+r.dataset.day)));
   $$('[data-prof-hit]').forEach((h) => h.addEventListener('click', () => pick(+h.dataset.profHit)));
-  pick(MOB ? 2 : 2);
-  // booking panel
+  const first = $('.k-day-on'); pick(first ? +first.dataset.day : 2);
+  // booking panel: shows this route; the booking in progress switches to it on the first touch
+  const mine = S.route === PK;
+  const L = { dep: mine ? S.dep : PR.defdep, n: S.n };
+  const lfree = (i = L.dep) => 8 - PR.deps[i].taken;
+  if (lfree() < 1) L.dep = PR.defdep;
+  if (L.n > Math.min(4, lfree())) L.n = Math.max(1, Math.min(4, lfree()));
+  const commit = () => { useRoute(PK); S.dep = L.dep; S.n = L.n; save(); };
   const paintPanel = () => {
-    $$('[data-dep]').forEach((b) => press(b, +b.dataset.dep === S.dep, CARD_ON, { background: 'transparent', border: '1px solid #14181A26' }));
-    bind('n', S.n);
-    bind('total', eur(PRICE * S.n));
-    bind('total-label', `Total for ${S.n}`);
-    $$('[data-book]').forEach((b) => { b.textContent = `Book ${S.n} place${S.n > 1 ? 's' : ''}`; });
+    $$('[data-dep]').forEach((b) => press(b, +b.dataset.dep === L.dep, CARD_ON, { background: 'transparent', border: '1px solid #14181A26' }));
+    bind('n', L.n);
+    bind('total', eur(PR.price * L.n));
+    bind('total-label', `Total for ${L.n}`);
+    $$('[data-book]').forEach((b) => { b.textContent = `Book ${L.n} place${L.n > 1 ? 's' : ''}`; });
   };
-  $$('[data-dep]').forEach((b) => b.addEventListener('click', () => { S.dep = +b.dataset.dep; if (S.n > MAXN()) S.n = MAXN(); save(); paintPanel(); }));
-  $$('[data-n]').forEach((b) => b.addEventListener('click', () => {
-    const v = S.n + +b.dataset.n;
-    if (v < 1) return;
-    if (v > MAXN()) { toast(free() <= 4 ? `Only ${free()} place${free() > 1 ? 's' : ''} left on ${dep().d}` : 'One booking holds up to 4 people'); return; }
-    S.n = v; save(); paintPanel();
+  $$('[data-dep]').forEach((b) => b.addEventListener('click', () => {
+    const i = +b.dataset.dep;
+    if (lfree(i) < 1) { toast(`${PR.deps[i].d} is full. The waitlist is not designed in this concept.`); return; }
+    L.dep = i; if (L.n > Math.min(4, lfree())) L.n = Math.min(4, lfree()); commit(); paintPanel();
   }));
-  $$('[data-book]').forEach((b) => b.addEventListener('click', () => { save(); location.href = P('book-1.html'); }));
+  $$('[data-n]').forEach((b) => b.addEventListener('click', () => {
+    const v = L.n + +b.dataset.n, mx = Math.min(4, lfree());
+    if (v < 1) return;
+    if (v > mx) { toast(lfree() <= 4 ? `Only ${lfree()} place${lfree() > 1 ? 's' : ''} left on ${PR.deps[L.dep].d}` : 'One booking holds up to 4 people'); return; }
+    L.n = v; commit(); paintPanel();
+  }));
+  $$('[data-book]').forEach((b) => b.addEventListener('click', () => { commit(); location.href = P('book-1.html'); }));
   paintPanel();
   // photos
   $$('[data-photos]').forEach((b) => b.addEventListener('click', () => {
@@ -265,16 +289,27 @@ if (page === 'route') {
   addEventListener('keydown', (e) => { if (e.key === 'Escape') { const lb = $('.k-lb'); if (lb) lb.classList.remove('on'); } });
 }
 
+/* ---------- route details shared by booking, booked and my trips ---------- */
+const paintRoute = (RR = R) => {
+  bind('r-name', RR.name);
+  bind('r-sub', RR.glabel);
+  $$('[data-r-photo]').forEach((im) => { im.src = RR.photo; im.style.objectPosition = RR.pos; im.alt = RR.name; });
+  $$('[data-r-vt]').forEach((e) => { e.style.viewTransitionName = 'k-ph-' + RR.key; });
+  $$('[data-r-link]').forEach((a) => { const u = P('route-' + RR.slug + '.html'); if (a.tagName === 'A') a.href = u; else a.dataset.go = u; });
+};
+
 /* ================================================================ BOOKING */
 if (page && page.startsWith('book')) {
   const step = +page.slice(4);
+  paintRoute();
+  bind('ex-where', R.exwhere);
   const paintSummary = () => {
-    bind('dates', S.dep === 1 ? '22 to 27 July 2027' : dep().full);
+    bind('dates', dep().full);
     $$('[data-mine-seats]').forEach((e) => setSeats(e, dep().taken, S.n, +e.dataset.mineSeats));
-    let lines = `<div class="k-line"><span>${S.n} × Lyngen Alps traverse</span><span>${eur(PRICE * S.n)}</span></div>`;
-    if (step >= 3) EXTRAS.forEach((x) => { const q = S.ex[x.k] || 0; if (q) lines += `<div class="k-line"><span>${q} × ${x.name}</span><span>${eur(q * x.price)}</span></div>`; });
+    let lines = `<div class="k-line"><span>${S.n} × ${R.name}</span><span>${eur(PRICE() * S.n)}</span></div>`;
+    if (step >= 3) allowed().forEach((x) => { const q = S.ex[x.k] || 0; if (q) lines += `<div class="k-line"><span>${q} × ${x.name}</span><span>${eur(q * x.price)}</span></div>`; });
     bind('lines', lines);
-    const t = step >= 3 ? total() : PRICE * S.n;
+    const t = step >= 3 ? total() : PRICE() * S.n;
     bind('sum-total', eur(t));
     bind('sum-deposit', eur(DEPOSIT * S.n));
     bind('sum-balance', eur(t - DEPOSIT * S.n));
@@ -283,28 +318,47 @@ if (page && page.startsWith('book')) {
     bind('n', S.n);
     bind('m-total', eur(t));
   };
-  // step 1
-  $$('[data-dep-card]').forEach((c) => c.addEventListener('click', () => { S.dep = +c.dataset.depCard; if (S.n > MAXN()) S.n = MAXN(); save(); paint1(); }));
+  // step 1: departure cards are drawn from the route data
+  const box = $('[data-dep-cards]');
+  if (box) {
+    const tpl = box.dataset.tpl ? JSON.parse(box.dataset.tpl) : null;
+    box.innerHTML = R.deps.map((d, i) => `<button type="button" data-dep-card="${i}" aria-pressed="false" style="${tpl.btn}">
+<span style="display:flex;justify-content:space-between;align-items:baseline"><span style="${tpl.date}">${d.d}</span><span style="font-size:13px;color:#4A5458">Guide: ${d.guide}</span></span>
+<span role="img" data-seats="14" style="display:flex;gap:3px"></span><span data-left style="font-size:14px"></span></button>`).join('');
+  }
   const paint1 = () => {
     $$('[data-dep-card]').forEach((c) => {
-      const i = +c.dataset.depCard, on = i === S.dep;
+      const i = +c.dataset.depCard, on = i === S.dep, d = R.deps[i];
       press(c, on, CARD_ON, CARD_OFF);
-      setSeats($('[data-seats]', c), DEPS[i].taken, on ? S.n : 0, +$('[data-seats]', c).dataset.seats);
-      const f = 8 - DEPS[i].taken;
-      $('[data-left]', c).textContent = on ? (S.n === f ? `The last ${f === 1 ? 'place' : f + ' places'}, yours` : `${S.n} yours, ${f - S.n} still free`) : `${f} place${f > 1 ? 's' : ''} left`;
+      setSeats($('[data-seats]', c), d.taken, on ? S.n : 0, +$('[data-seats]', c).dataset.seats);
+      const f = 8 - d.taken;
+      $('[data-left]', c).textContent = f < 1 ? 'Full, waitlist' : on ? (S.n === f ? `The last ${f === 1 ? 'place' : f + ' places'}, yours` : `${S.n} yours, ${f - S.n} still free`) : `${f} place${f > 1 ? 's' : ''} left`;
       $('[data-left]', c).style.fontWeight = on ? '700' : '400';
+      c.style.opacity = f < 1 ? '0.55' : '';
     });
     paintSummary();
   };
+  $$('[data-dep-card]').forEach((c) => c.addEventListener('click', () => {
+    const i = +c.dataset.depCard;
+    if (8 - R.deps[i].taken < 1) { toast(`${R.deps[i].d} is full. The waitlist is not designed in this concept.`); return; }
+    S.dep = i; if (S.n > MAXN()) S.n = MAXN(); save(); paint1();
+  }));
   $$('[data-n]').forEach((b) => b.addEventListener('click', () => {
     const v = S.n + +b.dataset.n;
     if (v < 1) return;
     if (v > MAXN()) { toast(free() < 4 ? `Only ${free()} place${free() > 1 ? 's' : ''} left on ${dep().d}. Pick another date for more.` : 'One booking holds up to 4 people'); return; }
-    S.n = v; save(); paint1(); paintT2();
+    S.n = v;
+    allowed().forEach((x) => { if (x.per && S.ex[x.k] > S.n) S.ex[x.k] = S.n; });
+    save(); paint1(); paintT2();
   }));
   // step 2: second traveller block follows the count
   const paintT2 = () => { $$('[data-t2]').forEach((e) => { e.style.display = S.n > 1 ? '' : 'none'; }); bind('t2-label', S.n > 2 ? `Traveller 2 <span style="font-weight:400;font-size:15px;color:#4A5458">(and ${S.n - 2} more, we email them the same form)</span>` : 'Traveller 2'); };
-  // step 3 extras
+  // step 3 extras: only what this route needs
+  $$('[data-ex]').forEach((row) => {
+    const note = R.extras ? R.extras[row.dataset.ex] : undefined;
+    if (note === undefined) row.style.display = 'none';
+    else { const n = $('[data-ex-note]', row); if (n) n.textContent = note; }
+  });
   const paint3 = () => {
     $$('[data-ex]').forEach((row) => {
       const k = row.dataset.ex, q = S.ex[k] || 0;
@@ -335,7 +389,9 @@ if (page && page.startsWith('book')) {
   $$('label[data-terms]').forEach((l) => l.addEventListener('k-change', () => { S.terms = !!l.dataset.on; save(); }));
   $$('[data-pay-go]').forEach((b) => b.addEventListener('click', () => {
     if (!S.terms) { toast('Tick the cancellation terms first'); return; }
-    b.textContent = 'Booking…'; setTimeout(() => { location.href = P('booked.html'); }, 700);
+    b.textContent = 'Booking…';
+    S.trip = { route: S.route, dep: S.dep, n: S.n, pay: S.pay, ex: Object.assign({}, S.ex) }; save();
+    setTimeout(() => { location.href = P('booked.html'); }, 700);
   }));
   $$('label[data-share]').forEach((l) => { setCheck(l, S.share); l.addEventListener('k-change', () => { S.share = !!l.dataset.on; save(); }); });
   $$('label[data-terms]').forEach((l) => setCheck(l, S.terms));
@@ -345,40 +401,59 @@ if (page && page.startsWith('book')) {
   if (step === 4) { paint4(); paintSummary(); }
 }
 
+/* the trip shown on Booked and My trips: the last booking made, Lyngen by default */
+const TRIP = (() => {
+  const t = S.trip && RT[S.trip.route] ? S.trip : { route: 'hero', dep: 1, n: 2, pay: 'deposit', ex: exDefault('hero') };
+  const TR = RT[t.route], d = TR.deps[t.dep] || TR.deps[TR.defdep];
+  const ext = EXTRAS.filter((x) => TR.extras && TR.extras[x.k] !== undefined).reduce((a, x) => a + x.price * ((t.ex || {})[x.k] || 0), 0);
+  const tot = TR.price * t.n + ext;
+  return { t, R: TR, d, total: tot, balance: tot - DEPOSIT * t.n, due: balanceDate(d) };
+})();
+
 /* ================================================================ BOOKED */
 if (page === 'booked') {
-  const n = S.n, d = dep();
+  const { t, R: TR, d } = TRIP;
+  const n = t.n;
+  paintRoute(TR);
   const code = 'KT-27-' + String(d.start[1] + 1).padStart(2, '0') + String(d.start[2]).padStart(2, '0') + '-14';
   bind('code', 'Booking ' + code);
-  bind('headline', `You are in.<br>${words[n]} place${n > 1 ? 's' : ''} on<br>the Lyngen ridge.`);
+  bind('headline', `You are in.<br>${words[n]} place${n > 1 ? 's' : ''} ${TR.on[0]}<br>${TR.on[1]}.`);
   $$('[data-big-seats]').forEach((e) => { let h = ''; for (let i = 0; i < 8; i++) h += `<span style="display:block;width:${e.dataset.bigSeats}px;height:${e.dataset.bigSeats}px;box-sizing:border-box;${i < d.taken ? 'background:' + INK : i < d.taken + n ? 'background:' + ORANGE : 'border:2px solid ' + INK}"></span>`; e.innerHTML = h; });
   const left = 8 - d.taken - n;
   bind('seat-note', `The orange square${n > 1 ? 's are' : ' is'} you. ${left ? left + ' place' + (left > 1 ? 's' : '') + ' still open.' : 'The group is full.'}`);
+  $$('[data-r-night]').forEach((im) => { im.src = TR.night[0]; im.style.objectPosition = TR.night[2]; im.alt = TR.night[1]; });
+  bind('night-cap', TR.night[1]);
   const st = dateOf(d.start), call = new Date(st); call.setDate(call.getDate() - 59); const meet = new Date(st); meet.setDate(meet.getDate() - 1);
   bind('next-call-date', 'Week of ' + fmtDay(call));
   bind('next-call', `${d.guide.split(' ')[0]}, your guide, calls ${n === 2 ? 'you both' : n > 2 ? 'you all' : 'you'}. 20 minutes.`);
-  bind('next-bal-date', balanceDate());
-  bind('next-bal', S.pay === 'full' ? 'Nothing left to pay. Paid in full today.' : `Balance ${eur(total() - DEPOSIT * n)} due. We remind you a week before.`);
+  bind('next-bal-date', TRIP.due);
+  bind('next-bal', t.pay === 'full' ? 'Nothing left to pay. Paid in full today.' : `Balance ${eur(TRIP.balance)} due. We remind you a week before.`);
   bind('next-meet-date', fmtDay(meet) + ', 18:00');
+  bind('next-meet', `Meet in ${TR.meet}. Kit check and dinner.`);
   $$('[data-ics]').forEach((b) => b.addEventListener('click', () => {
     const p = (x) => String(x).padStart(2, '0');
-    const s = dateOf(d.start), e = new Date(s); e.setDate(e.getDate() + 6);
+    const s = dateOf(d.start), e = new Date(s); e.setDate(e.getDate() + TR.days);
     const f = (x) => x.getFullYear() + p(x.getMonth() + 1) + p(x.getDate());
     const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Kote concept//EN', 'BEGIN:VEVENT', 'UID:' + code + '@kote.concept', 'DTSTART;VALUE=DATE:' + f(s), 'DTEND;VALUE=DATE:' + f(e),
-      'SUMMARY:Lyngen Alps traverse (Kote concept)', 'LOCATION:Lyngseidet, Norway', 'DESCRIPTION:Concept prototype by Iryna Chelombitko. Not a real trip.', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' })); a.download = 'kote-lyngen.ics'; a.click();
+      'SUMMARY:' + TR.name + ' (Kote concept)', 'LOCATION:' + TR.meet + ', ' + TR.country, 'DESCRIPTION:Concept prototype by Iryna Chelombitko. Not a real trip.', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' })); a.download = 'kote-' + TR.slug + '.ics'; a.click();
   }));
 }
 
 /* ================================================================ MY TRIPS */
 if (page === 'trips') {
-  const d = dep();
+  const { t, R: TR, d } = TRIP;
+  paintRoute(TR);
   const days = Math.max(0, Math.ceil((dateOf(d.start) - new Date()) / 86400000));
   bind('days', days);
-  bind('trip-line', `${d.full.replace(' 2027', ' 2027')}, guide ${d.guide}`);
-  bind('trip-n', `Next trip, ${S.n} traveller${S.n > 1 ? 's' : ''}`);
-  bind('bal-due', `Due ${balanceDate()}`);
-  bind('bal-btn', S.pay === 'full' ? 'Paid in full' : 'Pay balance');
+  bind('trip-line', `${d.full}, guide ${d.guide}`);
+  bind('trip-n', `Next trip, ${t.n} traveller${t.n > 1 ? 's' : ''}`);
+  bind('bal-due', t.pay === 'full' ? 'Paid in full' : `Due ${TRIP.due}`);
+  bind('bal-title', t.pay === 'full' ? 'Balance' : `Balance ${eur(TRIP.balance)}`);
+  bind('dep-title', `${t.pay === 'full' ? 'Paid in full' : 'Deposit'} ${eur(t.pay === 'full' ? TRIP.total : DEPOSIT * t.n)}`);
+  bind('bal-btn', t.pay === 'full' ? 'Paid in full' : 'Pay balance');
+  bind('travel-a', TR.travel[0]);
+  bind('travel-b', TR.travel[1]);
 }
 
 /* ================================================================ AGENCY */
