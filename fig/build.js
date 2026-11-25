@@ -84,6 +84,20 @@
     if (d.op !== undefined) n.opacity = d.op;
   };
   const place = (n, d, parent) => { parent.appendChild(n); n.x = d.x; n.y = d.y; };
+  const TAGS = { div: 'Frame', section: 'Section', header: 'Header', footer: 'Footer', nav: 'Navigation', aside: 'Aside', figure: 'Figure', form: 'Form', button: 'Button', a: 'Link', ul: 'List', ol: 'List', li: 'Item', span: 'Shape', p: 'Paragraph', label: 'Label', h1: 'Heading', h2: 'Heading', h3: 'Heading', h4: 'Heading', main: 'Main', article: 'Card', figcaption: 'Caption', field: 'Input', table: 'Table', tr: 'Row', td: 'Cell', th: 'Cell', strong: 'Shape', b: 'Shape', i: 'Shape' };
+  const firstBig = (d) => {
+    let best = null;
+    const walk = n => { if (best) return; if (n.t === 'T' && n.segs[0].sz >= 24) { best = n.chars; return; } (n.ch || []).forEach(walk); };
+    walk(d); return best;
+  };
+  const niceName = (d) => {
+    const raw = d.n || 'Frame';
+    let base = TAGS[raw] || (raw.startsWith('k-') ? raw.slice(2).replace(/-/g, ' ').replace(/^./, c => c.toUpperCase()) : raw);
+    if (['Section', 'Header', 'Footer', 'Aside', 'Main', 'Card', 'Form', 'Figure'].includes(base)) {
+      const t = firstBig(d); if (t) base += ' · ' + t.replace(/\s+/g, ' ').slice(0, 36);
+    } else if ((base === 'Button' || base === 'Link') && d.ch && d.ch.length === 1 && d.ch[0].t === 'T') base += ' · ' + d.ch[0].chars.slice(0, 30);
+    return base;
+  };
 
   const build = async (d, parent) => {
     try {
@@ -92,7 +106,7 @@
         if (d.t === 'R' && !d.poly) n = figma.createRectangle();
         else if (d.t === 'R' && d.poly) { const pv = polyVector(d.poly, d.w, d.h); n = pv.v; parent.appendChild(n); pv.wrap.remove(); d = Object.assign({}, d, { x: d.x + pv.vx, y: d.y + pv.vy }); }
         else { n = figma.createFrame(); n.clipsContent = !!d.clip; }
-        n.name = d.n || 'layer';
+        n.name = niceName(d);
         place(n, d, parent);
         if (!(d.t === 'R' && d.poly)) n.resize(Math.max(0.01, d.w), Math.max(0.01, d.h));
         n.fills = d.fill ? [paint(d.fill)] : [];
