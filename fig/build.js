@@ -1,6 +1,7 @@
 // Kote screens -> editable Figma layers. Loaded in Scripter with:
-//   const SLUGS = [...]; const PAGE = 'Desktop'; await eval(await (await fetch(BASE + 'build.js')).text())
+//   globalThis.__K = { SLUGS: [...], PAGE: 'Desktop', print, fetch }; await eval(await (await fetch(BASE + 'build.js')).text())
 (async () => {
+  const { SLUGS, PAGE, print, fetch } = globalThis.__K;
   const BASE = 'https://irynachelombitko.github.io/kote/fig/';
   const log = [];
   const errs = [];
