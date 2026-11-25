@@ -462,6 +462,11 @@ if (page === 'trips') {
   bind('kit-sub', `${kitN} of ${kitT} items ticked`);
   bind('kit-count', `${kitN} of ${kitT}`);
   $$('[data-kitbar]').forEach((e) => { let h = ''; for (let i = 0; i < kitT; i++) h += `<span style="flex:1;height:8px;background:${i < kitN ? INK : '#14181A26'}"></span>`; e.innerHTML = h; });
+  const tick = (key) => { const el = $(`[data-b="${key}"]`); const row = el && el.closest('div[style*="grid"], [data-go]'); if (!row) return;
+    const box = row.querySelector('span'); if (box) { box.style.cssText = 'width:20px;height:20px;background:#14181A;display:flex;align-items:center;justify-content:center;flex:none'; box.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5l2.6 2.6L10 3.5" fill="none" stroke="#F3F5F4" stroke-width="2"/></svg>'; }
+    const a = row.querySelector('a'); if (a) a.textContent = 'View'; };
+  if (t.pay === 'full') { tick($('[data-b="bal-title"]') ? 'bal-title' : 'bal-due'); bind('bal-due', 'Nothing left to pay'); }
+  if (kitN >= kitT) tick('kit-sub');
   bind('ready-n', `${2 + (kitN >= kitT ? 1 : 0) + (t.pay === 'full' ? 1 : 0)} of 5 done`);
 }
 
@@ -504,7 +509,7 @@ if (page === 'fitness') {
     const G = Q.G[g - 1];
     bind('fit-label', 'Your grade, before the call');
     bind('fit-grade', g); bind('fit-name', G.short);
-    bind('fit-text', `Days up to ${G.a}, ${G.h}. Pack ${G.p}. ${G.t}.`);
+    bind('fit-text', `Days ${G.a}, ${G.h}. Pack ${G.p}. ${G.t}.`);
     let rs = (Q.routes[g] || []).concat(g >= 4 ? (Q.routes[g - 1] || []) : []);
     let note = '';
     if (!rs.length) { rs = Q.routes[3] || []; note = `<div style="font-size:14px;line-height:1.45;color:#D3D9DA">Kote runs grades 3 to 5 only. These two are the gentlest; mention it on the call.</div>`; }
