@@ -63,3 +63,16 @@ button:focus-visible,a:focus-visible,label:focus-visible,input:focus-visible{out
 .ag-bar:hover{opacity:1;outline:2px solid #14181A;outline-offset:2px}
 .ag-bar:hover::after,.ag-bar:focus-visible::after{opacity:1}
 .ag-chips button{white-space:nowrap}
+
+.k-modal{position:fixed;inset:0;background:#14181A99;display:flex;align-items:center;justify-content:center;z-index:60;animation:kfade .16s}
+.k-modal{font-family:Archivo,'Arial Narrow',Arial,sans-serif;color:#14181A}
+.k-modal>form{background:#F3F5F4;width:min(460px,calc(100vw - 32px));padding:26px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px;animation:krise .22s}
+.k-modal h3{margin:0;font-size:34px;line-height:.95;font-weight:800;font-stretch:62%}
+.k-modal label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#4A5458}
+.k-modal input,.k-modal select,.k-modal textarea{font:inherit;font-size:16px;color:#14181A;background:#fff;border:1.5px solid #14181A40;padding:12px;border-radius:0}
+.k-modal .k-row{display:flex;gap:8px;justify-content:flex-end}
+.k-modal button{font:inherit;font-size:15px;font-weight:700;padding:12px 16px;border:1.5px solid #14181A;background:transparent;color:#14181A;cursor:pointer}
+.k-modal button[type=submit]{background:#14181A;color:#F3F5F4}
+.k-modal small{font-size:13px;color:#4A5458}
+@keyframes kfade{from{opacity:0}}@keyframes krise{from{opacity:0;transform:translateY(10px)}}
+.m-chips::-webkit-scrollbar{display:none}

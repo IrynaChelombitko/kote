@@ -201,7 +201,7 @@ if (page === 'search') {
     arts.forEach((a) => {
       const d = a.dataset;
       const ok = F.reg.has(d.reg) && F.grades.has(+d.g) && d.months.split(',').includes(F.month);
-      a.style.display = ok ? '' : 'none';
+      a.style.display = ok ? 'flex' : 'none';
       if (ok) shown.push(a);
     });
     const key = { next: (a) => +a.dataset.next, price: (a) => +a.dataset.price, ascent: (a) => -a.dataset.up, grade: (a) => -a.dataset.g }[F.sort];
@@ -232,7 +232,6 @@ if (page === 'search') {
     $$('label[data-f-reg]').forEach((l) => setCheck(l, true));
     $$('[data-f-grade]').forEach((x) => press(x, true, CHIP_ON, CHIP_OFF)); apply();
   }));
-  $$('[data-f-map]').forEach((b) => b.addEventListener('click', () => toast('The map view is not designed in this concept.')));
   $$('[data-f-update]').forEach((b) => b.addEventListener('click', () => { apply(); toast('Filters applied'); }));
   apply();
 }
@@ -266,7 +265,7 @@ if (page === 'route') {
   };
   $$('[data-dep]').forEach((b) => b.addEventListener('click', () => {
     const i = +b.dataset.dep;
-    if (lfree(i) < 1) { toast(`${PR.deps[i].d} is full. The waitlist is not designed in this concept.`); return; }
+    if (lfree(i) < 1) { window.koteWaitlist(PR.deps[i].d, PR.name); return; }
     L.dep = i; if (L.n > Math.min(4, lfree())) L.n = Math.min(4, lfree()); commit(); paintPanel();
   }));
   $$('[data-n]').forEach((b) => b.addEventListener('click', () => {
@@ -344,7 +343,7 @@ if (page && page.startsWith('book')) {
   };
   $$('[data-dep-card]').forEach((c) => c.addEventListener('click', () => {
     const i = +c.dataset.depCard;
-    if (8 - R.deps[i].taken < 1) { toast(`${R.deps[i].d} is full. The waitlist is not designed in this concept.`); return; }
+    if (8 - R.deps[i].taken < 1) { window.koteWaitlist(R.deps[i].d, R.name); return; }
     S.dep = i; if (S.n > MAXN()) S.n = MAXN(); save(); paint1();
   }));
   $$('[data-n]').forEach((b) => b.addEventListener('click', () => {
@@ -395,6 +394,7 @@ if (page && page.startsWith('book')) {
     if (!S.terms) { toast('Tick the cancellation terms first'); return; }
     b.textContent = 'Booking…';
     S.trip = { route: S.route, dep: S.dep, n: S.n, pay: S.pay, ex: Object.assign({}, S.ex) }; save();
+    sessionStorage.setItem('kote-toast', 'Booked in the prototype. Design concept: no payment was taken.');
     setTimeout(() => { location.href = P('booked.html'); }, 700);
   }));
   $$('label[data-share]').forEach((l) => { setCheck(l, S.share); l.addEventListener('k-change', () => { S.share = !!l.dataset.on; save(); }); });
@@ -584,7 +584,7 @@ if (page === 'pay') {
       if (paid) return;
       b.textContent = 'Paying…';
       S.trip = Object.assign({}, t, { pay: 'full' }); save();
-      sessionStorage.setItem('kote-toast', 'Balance paid. Nothing left to pay before the trip.');
+      sessionStorage.setItem('kote-toast', 'Balance marked as paid. Design concept: no money was taken.');
       setTimeout(() => { location.href = P('my-trips.html'); }, 700);
     });
   });
@@ -657,5 +657,77 @@ if (page === 'agency-payouts') {
     bind('k-due-s', left ? `${left} payout${left > 1 ? 's' : ''} wait for you` : 'Nothing waits for you'); bind('k-paid-s', `${$$('[data-po="Paid"]').length} payouts`);
     toast(`${eur(a)} sent to ${r.children[0].textContent}`);
   }));
+}
+/* ================================================================ FINISHING: dialogs, waitlist, contact, map view, phone filters */
+const ask = (title, text, fields, ok, done) => {
+  const m = document.createElement('div'); m.className = 'k-modal'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true');
+  m.innerHTML = `<form><h3>${title}</h3>${text ? `<div style="font-size:15px;line-height:1.45">${text}</div>` : ''}${fields.map((f) => `<label>${f.l}${f.opts ? `<select name="${f.n}">${f.opts.map((o) => `<option>${o}</option>`).join('')}</select>` : f.area ? `<textarea name="${f.n}" rows="4" required></textarea>` : `<input name="${f.n}" type="${f.t || 'text'}" required autocomplete="off" placeholder="${f.p || ''}">`}</label>`).join('')}
+<small>Design concept: nothing is sent or stored.</small><div class="k-row"><button type="button" data-x>Cancel</button><button type="submit">${ok}</button></div></form>`;
+  const close = () => m.remove();
+  m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-x]')) close(); });
+  m.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  m.querySelector('form').addEventListener('submit', (e) => { e.preventDefault(); const v = Object.fromEntries(new FormData(e.target)); close(); done(v); });
+  document.body.appendChild(m); const f = m.querySelector('input,select,textarea'); if (f) f.focus();
+};
+window.koteWaitlist = (d, name) => ask('Join the waitlist', `${d} on ${name} is full. Leave an email and you get the place if someone drops out.`, [{ l: 'Email', n: 'e', t: 'email', p: 'you@example.com' }], 'Join', () => toast(`You are on the waitlist for ${d}. Concept: no email is sent.`, 4200));
+$$('[data-msg-guide]').forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); ask('Message the guide', 'Your guide reads messages in the evening when there is signal.', [{ l: 'Message', n: 'm', area: 1 }], 'Send', () => toast('Message written. Concept: it is not sent to anyone.', 4200)); }));
+$$('[data-new-dep]').forEach((b) => b.addEventListener('click', () => ask('New departure', '', [{ l: 'Route', n: 'r', opts: Object.values(RT || {}).map((r) => r.name).filter(Boolean).length ? Object.values(RT).map((r) => r.name) : ['Lyngen Alps traverse', 'Sarek, no trail', 'Kebnekaise north ridge'] }, { l: 'First day', n: 'd', t: 'date' }, { l: 'Lead guide', n: 'g', opts: ['Ingrid H.', 'Mats E.', 'Siri L.', 'Jonas B.', 'Kaja R.', 'Ásta G.', 'Rói J.', 'Anna K.', 'Erik S.'] }], 'Save draft', (v) => toast(`Draft saved: ${v.r}, guide ${v.g}. Concept: it is not stored.`, 4200))));
+$$('[data-contact]').forEach((f) => f.addEventListener('submit', (e) => {
+  e.preventDefault(); e.stopImmediatePropagation(); const d = $('[data-contact-done]', f), n = f.elements.n.value.trim().split(' ')[0];
+  d.hidden = false; d.innerHTML = `<b>Thanks, ${n.replace(/[<>&]/g, '')}.</b> In the real product a guide would answer within two working days. This is a design concept, so the message was not sent.`; f.reset();
+}));
+if (page === 'search' && window.KOTE_MAPS) {
+  const mb = $('[data-f-map]'), lb = $('[data-f-list]');
+  const view = (map) => {
+    press(mb, map, CHIP_ON, CHIP_OFF); press(lb, !map, CHIP_ON, CHIP_OFF);
+    $$('article[data-route]').forEach((a) => {
+      const box = a.firstElementChild; let o = box.querySelector('[data-mapview]');
+      if (map && !o) { o = document.createElement('div'); o.dataset.mapview = ''; o.style.cssText = 'position:absolute;inset:0'; o.innerHTML = window.KOTE_MAPS[a.dataset.route] || ''; const s = o.querySelector('svg'); if (s) { s.setAttribute('preserveAspectRatio', 'xMidYMid slice'); s.style.width = '100%'; s.style.height = '100%'; } box.style.position = 'relative'; box.appendChild(o); }
+      if (o) o.style.display = map ? '' : 'none';
+    });
+  };
+  if (mb && lb) { mb.addEventListener('click', () => view(true)); lb.addEventListener('click', () => view(false)); }
+}
+if (page === 'search' && $('[data-mg]')) {
+  const MF = { g: 'all', r: 'all' }, cards = $$('article[data-g]');
+  const run = () => { let n = 0; cards.forEach((c) => { const ok = (MF.g === 'all' || c.dataset.g === MF.g) && (MF.r === 'all' || c.dataset.reg === MF.r); c.style.display = ok ? 'flex' : 'none'; n += ok; });
+    bind('m-count', n ? `${n} route${n === 1 ? '' : 's'} this summer` : 'No routes match'); bind('m-sorted', n ? 'Sorted by next departure' : 'Try another grade or region.'); };
+  const set = (attr, key) => { const cs = $$(`[${attr}]`); cs.forEach((c) => c.addEventListener('click', () => { cs.forEach((x) => press(x, x === c, CHIP_ON, CHIP_OFF)); MF[key] = c.getAttribute(attr); run(); })); };
+  set('data-mg', 'g'); set('data-mr', 'r');
+}
+if (page === 'trips') {
+  $$('a[href="#"]').forEach((a) => { const row = a.closest('div[style*="grid"]') || a.parentElement, t = row.textContent;
+    if (/Deposit/.test(t) && a.textContent.trim() === 'View') a.href = P('booked.html');
+    if (/Travel to/.test(t)) a.href = routeUrl(TRIP.route);
+    if (/Photos from/.test(a.textContent)) { const h = (a.nextElementSibling || {}).href; if (h) a.href = h; }
+  });
+}
+if (page === 'agency') {
+  const KP = { week: ['Bookings, this week', '14', '+3 on last week', 'Revenue booked', '€26,480', '€9,700 still to collect', 'Groups filled, July', '78%', '69 of 88 places', 'Waitlist', '23', '9 on Lyngen in July'],
+    month: ['Bookings, November', '46', '+12 on October', 'Revenue booked', '€84,320', '€31,900 still to collect', 'Groups filled, summer', '71%', '113 of 160 places', 'Waitlist', '23', '9 on Lyngen in July'],
+    season: ['Bookings, summer 2027', '128', '26 departures on sale', 'Revenue booked', '€241,900', '€96,300 still to collect', 'Groups filled, summer', '71%', '113 of 160 places', 'Waitlist', '23', '5 routes have a list'] };
+  const h1 = $('main h1') || $('h1'), TT = { week: 'This week at a glance', month: 'Summer 2027 at a glance', season: 'The whole season at a glance' };
+  const tiles = h1 ? [...h1.closest('main').querySelectorAll('div')].filter((d) => d.children.length === 3 && /font-size: 40px/.test(d.children[1].getAttribute('style') || '')) : [];
+  $$('[data-range]').forEach((c) => { const n = c.cloneNode(true); c.replaceWith(n); });
+  $$('[data-range]').forEach((c) => c.addEventListener('click', () => { $$('[data-range]').forEach((x) => press(x, x === c, CHIP_ON, CHIP_OFF)); const v = KP[c.dataset.range];
+    tiles.forEach((t, i) => { [0, 1, 2].forEach((k) => { t.children[k].textContent = v[i * 3 + k]; }); }); if (h1) h1.textContent = TT[c.dataset.range]; }));
+}
+if (page === 'agency-bookings' && $('[data-pg-go]')) {
+  let pg = 1; const all = $$('tbody tr'), rowPg = (r) => +(r.dataset.pg || 1);
+  const active = () => { const c = $$('[data-st]').find((x) => x.getAttribute('aria-pressed') === 'true'); return c ? c.dataset.st : 'all'; };
+  const paint = () => { const f = active();
+    if (f === 'all') { all.forEach((r) => { r.style.display = rowPg(r) === pg ? '' : 'none'; }); bind('pg-n', pg === 1 ? '1 to 12 of 312' : '13 to 24 of 312'); }
+    else bind('pg-n', `${all.filter((r) => r.style.display !== 'none').length} shown`);
+    $$('[data-pg-go]').forEach((a) => { a.style.opacity = f !== 'all' || +a.dataset.pgGo === pg ? '.35' : '1'; }); };
+  $$('[data-pg-go]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); if (active() !== 'all') return; pg = +a.dataset.pgGo; paint(); }));
+  $$('[data-st]').forEach((c) => c.addEventListener('click', () => setTimeout(paint, 0)));
+}
+const byText = (t) => $$('button').filter((b) => b.textContent.trim() === t && !b.dataset.msgGuide);
+byText('Message the guide').forEach((b) => { if (b.dataset.msgGuide === undefined) b.addEventListener('click', () => ask('Message the guide', 'Your guide reads messages in the evening when there is signal.', [{ l: 'Message', n: 'm', area: 1 }], 'Send', () => toast('Message written. Concept: it is not sent to anyone.', 4200))); });
+if (page === 'agency-bookings') {
+  const who = () => ((($('[data-drawer]') || document).querySelector('[data-b="dr-name"]') || {}).textContent || 'the traveller').trim();
+  byText('Book the call').forEach((b) => b.addEventListener('click', () => toast('Call slot offered for the fitness call. Concept: nothing is sent.', 4200)));
+  byText('Send reminder').forEach((b) => b.addEventListener('click', () => toast('Balance reminder drafted. Concept: no email is sent.', 4200)));
+  byText('Move date').forEach((b) => b.addEventListener('click', () => ask('Move to another date', 'Moving is free until eight weeks before the start.', [{ l: 'New departure', n: 'd', opts: ['8 to 13 Jul, 3 places left', '5 to 10 Aug, 2 places left', '19 to 24 Aug, 5 places left'] }], 'Move', (v) => toast(`Moved to ${v.d.split(',')[0]}. Concept: nothing is stored.`, 4200))));
 }
 })();
