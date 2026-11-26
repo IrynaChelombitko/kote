@@ -41,3 +41,25 @@ button:focus-visible,a:focus-visible,label:focus-visible,input:focus-visible{out
 [data-day]{transition:background-color .2s}
 [data-dep],[data-dep-card],[data-pay]{transition:background-color .15s,border-color .15s}
 @media (prefers-reduced-motion:reduce){::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}[data-day],[data-dep],[data-dep-card],[data-pay]{transition:none}}
+
+.ag-nav{display:flex;flex-direction:column;gap:2px}
+.ag-a{display:flex;align-items:center;gap:12px;padding:11px 12px;font-size:15px;font-weight:500;color:#C9D0D2;text-decoration:none;position:relative;transition:background .14s,color .14s,transform .08s}
+.ag-a svg{flex:none;transition:transform .16s}
+.ag-a:hover{background:#F3F5F41F;color:#F3F5F4}
+.ag-a:hover svg{transform:translateX(2px)}
+.ag-a:active{background:#F3F5F438;transform:translateY(1px) scale(.985)}
+.ag-a:focus-visible{outline:2px solid #F25C05;outline-offset:2px}
+.ag-a[aria-current=page]{background:#F3F5F4;color:#14181A;font-weight:700}
+.ag-a[aria-current=page]:hover svg{transform:none}
+.ag-a[aria-current=page]:active{background:#DCE2E1}
+.ag-n{margin-left:auto;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;background:#F25C05;color:#14181A;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.ag-row{cursor:pointer;transition:background .12s}
+.ag-row:hover{background:#F3F5F4}
+.ag-row:active{background:#E2E7E6}
+.ag-row[aria-selected=true]{background:#F3F5F4;box-shadow:inset 3px 0 0 #F25C05}
+.ag-bar{transition:opacity .15s,transform .1s}
+.ag-bar:active{transform:translateY(1px)}
+.ag-bar::after{content:attr(data-tip);position:absolute;left:0;bottom:calc(100% + 6px);background:#14181A;color:#F3F5F4;font-size:12px;font-weight:600;padding:5px 8px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .12s;z-index:3}
+.ag-bar:hover{opacity:1;outline:2px solid #14181A;outline-offset:2px}
+.ag-bar:hover::after,.ag-bar:focus-visible::after{opacity:1}
+.ag-chips button{white-space:nowrap}

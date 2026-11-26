@@ -615,4 +615,47 @@ if (page === 'agency-bookings') {
 if (page === 'agency') {
   $$('[data-range]').forEach((c) => c.addEventListener('click', () => { $$('[data-range]').forEach((x) => press(x, x === c, CHIP_ON, CHIP_OFF)); toast('Only the month view has data in this concept'); }));
 }
+$$('[data-say]').forEach((b) => b.addEventListener('click', () => toast(b.dataset.say)));
+const chipset = (attr, fn) => { const cs = $$(`[${attr}]`); cs.forEach((c) => c.addEventListener('click', () => { cs.forEach((x) => press(x, x === c, CHIP_ON, CHIP_OFF)); fn(c.getAttribute(attr)); })); };
+if (page === 'agency-departures') {
+  const DD = window.KOTE_AG_DEPS, rows = $$('[data-dep]');
+  const dot = (c) => `<span style="width:8px;height:8px;background:${c};flex:none"></span>`;
+  const open = (r) => {
+    rows.forEach((x) => x.setAttribute('aria-selected', x === r ? 'true' : 'false'));
+    const d = DD[r.dataset.dep], g = d.group, sum = (f) => g.filter(f).reduce((a, x) => a + x.p, 0);
+    bind('ro-name', d.name); bind('ro-dates', d.d + ' 2027'); bind('ro-guide', 'Guide ' + d.guide);
+    $('[data-b="ro-seats"]').innerHTML = r.children[2].innerHTML;
+    bind('ro-paid', `${sum((x) => x.pay === 'Paid')}/${d.taken}`); bind('ro-fit', `${sum((x) => x.fit === 'Done')}/${d.taken}`); bind('ro-kit', `${sum((x) => x.kit === 20)}/${d.taken}`);
+    $('[data-b="ro-list"]').innerHTML = g.length ? g.map((x) => `<div style="display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:10px 0;border-top:1px solid #14181A1F;font-size:14px">
+<span style="font-weight:700">${x.n}${x.p > 1 ? ` <span style="font-weight:400;color:#4A5458">+${x.p - 1}</span>` : ''}</span><span style="display:flex;align-items:center;gap:7px;justify-content:flex-end">${dot(x.pay === 'Overdue' ? ORANGE : x.pay === 'Paid' ? INK : '#8B9497')}${x.pay}</span>
+<span style="font-size:13px;color:#4A5458">Fitness: ${x.fit}</span><span style="font-size:13px;color:${x.fit === 'No slot' ? ORANGE : '#4A5458'};text-align:right">Kit ${x.kit} of 20</span></div>`).join('') : '<div style="padding:10px 0;font-size:14px;color:#4A5458">Nobody has booked yet.</div>';
+  };
+  rows.forEach((r) => { r.addEventListener('click', () => open(r)); r.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(r); } }); });
+  chipset('data-dm', (m) => rows.forEach((r) => { r.style.display = m === 'all' || r.dataset.m === m ? '' : 'none'; }));
+  const want = new URLSearchParams(location.search).get('d');
+  const first = rows.find((r) => r.dataset.dep === want) || rows.find((r) => r.dataset.dep === 'hero-1') || rows[0];
+  open(first); if (want) first.scrollIntoView({ block: 'center' });
+}
+if (page === 'agency-guides') chipset('data-gl', (l) => $$('[data-guide]').forEach((g) => { g.style.display = l === 'all' || g.dataset.load === l ? 'grid' : 'none'; }));
+if (page === 'agency-rentals') {
+  chipset('data-dp', (d) => $$('[data-depot]').forEach((r) => { r.style.display = d === 'all' || r.dataset.depot === d ? '' : 'none'; }));
+  $$('[data-packed]').forEach((b) => b.addEventListener('click', () => {
+    const on = b.textContent !== 'Packed'; b.textContent = on ? 'Packed' : 'Mark packed';
+    Object.assign(b.style, on ? { background: INK, color: SNOW } : { background: 'transparent', color: INK });
+    b.closest('[data-pack]').style.opacity = on ? '.55' : '1';
+    bind('pack-n', `${$$('[data-packed]').filter((x) => x.textContent === 'Packed').length} of 4 packed`);
+  }));
+}
+if (page === 'agency-payouts') {
+  const eur = (n) => '€' + n.toLocaleString('en-US');
+  chipset('data-pf', (f) => $$('[data-po]').forEach((r) => { r.style.display = f === 'all' || r.dataset.po === f ? '' : 'none'; }));
+  $$('[data-approve]').forEach((b) => b.addEventListener('click', () => {
+    const r = b.closest('tr'), a = +b.dataset.approve, due = $('[data-b="k-due"]'), paid = $('[data-b="k-paid"]');
+    due.dataset.v = +due.dataset.v - a; paid.dataset.v = +paid.dataset.v + a; due.textContent = eur(+due.dataset.v); paid.textContent = eur(+paid.dataset.v);
+    r.dataset.po = 'Paid'; const st = r.querySelector('[data-po-st]'); st.children[0].style.background = INK; st.children[1].textContent = 'Paid';
+    b.remove(); const left = $$('[data-approve]').length;
+    bind('k-due-s', left ? `${left} payout${left > 1 ? 's' : ''} wait for you` : 'Nothing waits for you'); bind('k-paid-s', `${$$('[data-po="Paid"]').length} payouts`);
+    toast(`${eur(a)} sent to ${r.children[0].textContent}`);
+  }));
+}
 })();
